@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>New York 3D — My Interactive Travel World</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>window.maplibregl||document.write('<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"><script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"><\/script>')</script>
+<style>
+:root{--bg:#0b0d14;--fg:#eef1f8;--glow:#6ee7ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,sans-serif}
+#map{position:absolute;inset:0}
+.night .maplibregl-canvas{filter:invert(1) hue-rotate(180deg) brightness(.85) saturate(.7)}
+#top{position:absolute;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top,0px) + 10px) 10px 10px;background:linear-gradient(#0b0d14ee,#0b0d1400);z-index:5}
+#top h1{margin:0 0 8px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+#top h1 span{color:var(--glow)}
+#chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chip{flex:none;border:1px solid #ffffff30;background:#12162299;backdrop-filter:blur(8px);color:var(--fg);border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer}
+.chip.off{opacity:.35}
+#bar{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:8px;flex-wrap:wrap;z-index:5}
+.btn{border:1px solid #6ee7ff66;background:#0b0d14cc;backdrop-filter:blur(8px);color:var(--glow);border-radius:12px;padding:10px 13px;font-size:13px;cursor:pointer;box-shadow:0 0 14px #6ee7ff33}
+#todo{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 70px);left:10px;max-width:360px;max-height:45%;overflow:auto;background:#0b0d14ee;border:1px solid #ffffff25;border-radius:14px;padding:12px;z-index:6;display:none;font-size:13px}
+#todo button{display:block;width:100%;text-align:left;margin:4px 0;padding:9px;background:#ffffff10;border:0;border-radius:8px;color:var(--fg);font-size:13px}
+.pin{width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 4px 12px #0008,0 0 14px var(--c);background:var(--c);cursor:pointer}
+.pin i{transform:rotate(45deg);font-style:normal;font-size:16px}
+.pin.unv{border-style:dashed}
+.maplibregl-popup-content{background:#12151f;color:var(--fg);border-radius:14px;padding:14px;min-width:230px;font-size:13px;line-height:1.45}
+.maplibregl-popup-tip{border-top-color:#12151f!important;border-bottom-color:#12151f!important}
+.maplibregl-popup-close-button{color:#fff;font-size:20px}
+.pop h3{margin:0 0 4px;font-size:16px}.pop small{opacity:.7}
+.pop a,.pop button{color:var(--glow);background:none;border:1px solid #6ee7ff55;border-radius:8px;padding:6px 9px;margin:6px 6px 0 0;font-size:12px;text-decoration:none;cursor:pointer;display:inline-block}
+.warn{color:#ffd166}
+#side{position:absolute;top:96px;left:10px;bottom:70px;width:310px;overflow:auto;background:#0b0d14ee;backdrop-filter:blur(10px);border:1px solid #ffffff25;border-radius:14px;padding:10px;z-index:5;font-size:13px}
+#side.hide{display:none}
+#side button{display:block;width:100%;text-align:left;margin:4px 0;padding:9px;background:#ffffff10;border:0;border-radius:8px;color:var(--fg);font-size:13px;cursor:pointer}
+#side h4{margin:8px 0}
+.it{display:flex;justify-content:space-between;gap:6px;padding:7px 4px;border-bottom:1px solid #ffffff15;cursor:pointer}
+.it u{text-decoration:none;padding:0 5px;color:var(--glow)}
+#rinfo{margin-top:8px;opacity:.85;line-height:1.5}
+#toast{position:absolute;top:110px;left:50%;transform:translateX(-50%);background:#0b0d14f0;border:1px solid #6ee7ff66;border-radius:10px;padding:9px 14px;font-size:13px;z-index:9;display:none;max-width:90%}
+#todo{left:auto;width:min(360px,calc(100% - 20px))}
+.dot{width:20px;height:20px;border-radius:50%;background:#fff;border:4px solid #00c2ff;box-shadow:0 0 0 0 #00c2ffaa,0 0 24px #00c2ff;animation:pulse 1.4s infinite}
+@keyframes pulse{to{box-shadow:0 0 0 18px #00c2ff00,0 0 24px #00c2ff}}
+#modes{display:flex;gap:6px;overflow-x:auto;padding-top:2px;scrollbar-width:none}
+#modes .chip{border-color:#6ee7ff66;color:var(--glow)}
+.explore #top,.explore #side,.explore #todo,.explore #toast{display:none!important}
+.explore #bar .btn:not(#bExplore){display:none}
+#bar{right:10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.btn{flex:none;white-space:nowrap}
+.it{flex-wrap:wrap}
+.sat.night .maplibregl-canvas{filter:brightness(.55)}
+#ov{position:absolute;inset:0;z-index:20;background:#0b0d14f5;overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 80px;display:none}
+#ov.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.card{background:#ffffff0d;border:1px solid #ffffff20;border-radius:12px;padding:10px;font-size:13px}
+.card h4{margin:0 0 6px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #ffffff12}
+.row input{background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;padding:3px;font-size:12px}
+@media(max-width:700px){#side{top:auto;left:10px;right:10px;width:auto;height:38%;bottom:70px}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="top"><h1>New York <span>3D</span> · My Travel World</h1><div id="chips"></div></div>
+<div id="bar">
+  <button class="btn" id="bMan">Manhattan</button>
+  <button class="btn" id="bBk">Brooklyn</button>
+  <button class="btn" id="bNight">🌙 Nuit</button>
+  <button class="btn" id="bTodo">📍 À localiser</button>
+  <button class="btn" id="bProg">📅 Programme</button>
+  <button class="btn" id="bRes">🎟 Réservations</button>
+  <button class="btn" id="bTour">🎬 Visite guidée</button>
+  <button class="btn" id="bFollow">🚶 Suivre le trajet</button>
+  <button class="btn" id="bExplore">🧭 Exploration</button>
+  <button class="btn" id="bCal">🗓 Calendrier</button>
+  <button class="btn" id="bSat">🛰 Satellite</button>
+  <button class="btn" id="bBud">💰 Budget</button>
+  <button class="btn" id="bSave">💾 Sauvegarde</button>
+  <button class="btn" id="bVer">✅ Tout vérifier</button>
+</div>
+<div id="side"></div><div id="toast"></div>
+<div id="todo"></div>
+
+<script>
+// [nom, catégorie, lat, lng, quartier, description]  — coordonnées approximatives, à valider via « Vérifier »
+const CATS={f:['🍔','Food','#ff8a3d'],p:['📸','Photo','#c084fc'],m:['🏙️','Monuments','#38bdf8'],s:['🛍️','Shopping','#f472b6'],r:['❤️','Romantique','#fb7185'],t:['🎬','Séries','#a3e635'],d:['🎭','Spectacles','#facc15'],h:['🏨','Hôtel','#94a3b8'],b:['🚁','Réservé / activité','#34d399'],g:['🌉','Ponts & vues','#22d3ee']};
+const P=[
+['Chelsea Market','s',40.7424,-74.0061,'Chelsea','Marché couvert, boutiques et food.'],
+['Broadway — spectacle','d',40.7590,-73.9845,'Theater District','Zone des théâtres : salle exacte à choisir. À réserver.'],
+['Times Square','m',40.7580,-73.9855,'Midtown','Écrans géants, énergie 24h/24.'],
+['Midnight Moment (Times Square)','m',40.7584,-73.9858,'Midtown','Animation artistique chaque nuit à minuit.'],
+['Staten Island Ferry (Whitehall)','g',40.7013,-74.0132,'Financial District','Ferry gratuit, vue sur la Statue de la Liberté.'],
+['Ferry East River (Pier 11)','g',40.7030,-74.0067,'Financial District','Départ des ferries de l’East River.'],
+['Central Park','m',40.7829,-73.9654,'Central Park',''],
+['Vélo Central Park (Columbus Circle)','b',40.7681,-73.9819,'Central Park','Point de départ indicatif — loueur à choisir.'],
+['American Museum of Natural History','m',40.7813,-73.9740,'Upper West Side',''],
+['Chinatown','m',40.7158,-73.9970,'Chinatown',''],
+['9/11 Memorial','m',40.7115,-74.0134,'Financial District',''],
+['9/11 Museum','b',40.7117,-74.0125,'Financial District','À réserver.'],
+['New York Public Library','m',40.7532,-73.9822,'Midtown',''],
+['SUMMIT One Vanderbilt','b',40.7534,-73.9784,'Midtown','À réserver.'],
+['Grand Central Terminal','m',40.7527,-73.9772,'Midtown',''],
+['Brooklyn Bridge — lever du soleil','g',40.7123,-74.0004,'Brooklyn Bridge','Côté Manhattan, face à l’est.'],
+['Brooklyn Bridge Park — coucher du soleil','p',40.7025,-73.9966,'DUMBO','Skyline de Manhattan au couchant.'],
+['DUMBO (Washington Street)','p',40.7033,-73.9895,'DUMBO','Le cadrage classique sur le Manhattan Bridge.'],
+['Manhattan Bridge','g',40.7075,-73.9908,'Lower East Side / DUMBO',''],
+['Hélicoptère (Downtown Heliport)','b',40.7012,-74.0090,'Financial District','Départ indicatif — à réserver.'],
+['Marches du MET','p',40.7794,-73.9632,'Upper East Side','Les marches de Gossip Girl.'],
+['Lotte New York Palace','t',40.7583,-73.9753,'Midtown','Hôtel de Gossip Girl (Chuck Bass).'],
+['Empire Hotel','t',40.7722,-73.9811,'Upper West Side','Lieu À VISITER (décor de Gossip Girl) — ce n’est PAS votre hôtel.'],
+['SpringHill Suites Chelsea — NOTRE HÔTEL','h',40.7458,-73.9915,'Chelsea','Votre hébergement : SpringHill Suites by Marriott New York Manhattan/Chelsea.'],
+['Bethesda Terrace','t',40.7740,-73.9710,'Central Park','Fontaine et esplanade, scènes de séries.'],
+['Constance Billard (Sacred Heart)','t',40.7835,-73.9566,'Upper East Side','Lycée de Gossip Girl.'],
+['Friends — 90 Bedford Street','t',40.7313,-74.0045,'West Village','Immeuble extérieur de la série.'],
+['Charging Bull','p',40.7056,-74.0134,'Financial District',''],
+['Upper East Side','m',40.7736,-73.9566,'Upper East Side',''],
+['230 Fifth Rooftop','r',40.7440,-73.9883,'NoMad','Rooftop avec vue Empire State.'],
+['M Social Times Square Rooftop','r',40.7567,-73.9858,'Midtown',''],
+['Pier 57 Rooftop','r',40.7424,-74.0087,'Chelsea',''],
+['Winter Village Bryant Park','m',40.7536,-73.9832,'Midtown','Ouverture aux dates du voyage : à vérifier.'],
+['Rockefeller Center','m',40.7587,-73.9787,'Midtown',''],
+['Téléphérique de Roosevelt Island','g',40.7613,-73.9640,'Upper East Side','Station côté Manhattan.'],
+['St. Patrick’s Cathedral','m',40.7585,-73.9760,'Midtown',''],
+['Trump Tower','m',40.7623,-73.9738,'Midtown','5th Avenue.'],
+['Hudson Yards','m',40.7536,-74.0007,'Hudson Yards',''],
+['Flatiron Building','m',40.7411,-73.9897,'Flatiron',''],
+['High Line','m',40.7480,-74.0048,'Chelsea',''],
+['Strawberry Fields','r',40.7756,-73.9753,'Central Park',''],
+['Domino Park — coucher du soleil','p',40.7148,-73.9674,'Williamsburg',''],
+['Williamsburg','m',40.7144,-73.9610,'Williamsburg',''],
+['Barclays Center','b',40.6826,-73.9754,'Brooklyn','Match — RÉSERVÉ (mercredi 17 février).'],
+['Levain Bakery (Upper West Side)','f',40.7792,-73.9807,'Upper West Side','Cookies. Adresse à vérifier.']
+];
+// Lieux sans position fiable : recherchés dans OpenStreetMap à la demande (toutes les succursales à NYC)
+const TODO=[['Mimi’s','f'],['Crumbl','f'],['Pizza à 1,50 $','f'],['Gnocchi on 9th','f'],['Shake Shack','f'],['Apollo Bagels','f'],['Leon’s Bagels','f'],['Ray’s Pizza','f'],['Raising Cane’s','f'],['McDonald’s','f'],['Wendy’s','f'],['Chick-fil-A','f'],['Arthur & Sons','f'],['KEA hot-dog','f'],['Pasta de Pasta','f'],['Joe & The Juice','f'],['Build-A-Bear','s'],['Bar jazz','d'],['Fifth Avenue (shopping)','s'],['SoHo (shopping)','s']];
+
+function fail(t){const e=document.createElement('div');e.style.cssText='position:absolute;z-index:30;top:120px;left:10px;right:10px;padding:14px;background:#3b1219;border:1px solid #fb7185;border-radius:12px;font-size:14px';e.textContent=t+' (toucher pour fermer)';e.onclick=()=>e.remove();document.body.appendChild(e)}
+if(!window.maplibregl){fail('La bibliothèque de carte ne s’est pas chargée : vérifie ta connexion, et ouvre le fichier directement dans Chrome ou Safari, pas dans l’aperçu du chat.');throw new Error('maplibre manquant')}
+if(!document.createElement('canvas').getContext('webgl')){fail('WebGL est désactivé sur cet appareil : la 3D ne peut pas s’afficher.');throw new Error('webgl')}
+// Style maison : fond clair, eau, parcs, rues, et bâtiments extrudés à partir des données OpenStreetMap (hauteurs réelles)
+const SRC='ofm',STYLE={version:8,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+ sources:{ofm:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'© OpenMapTiles © OpenStreetMap contributors · OpenFreeMap'}},
+ layers:[
+ {id:'bg',type:'background',paint:{'background-color':'#e9edf2'}},
+ {id:'green',type:'fill',source:SRC,'source-layer':'landcover',filter:['in',['get','class'],['literal',['grass','wood']]],paint:{'fill-color':'#cfe5c4'}},
+ {id:'parks',type:'fill',source:SRC,'source-layer':'park',paint:{'fill-color':'#c3e0b5'}},
+ {id:'water',type:'fill',source:SRC,'source-layer':'water',paint:{'fill-color':'#a9cdea'}},
+ {id:'roads',type:'line',source:SRC,'source-layer':'transportation',filter:['match',['get','class'],['rail','transit','ferry','aerialway'],false,true],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':['interpolate',['linear'],['zoom'],11,.4,15,3,18,12]}},
+ {id:'building-3d',type:'fill-extrusion',source:SRC,'source-layer':'building',minzoom:13,paint:{'fill-extrusion-color':'#d3d9e3','fill-extrusion-height':['coalesce',['get','render_height'],10],'fill-extrusion-base':['coalesce',['get','render_min_height'],0],'fill-extrusion-opacity':.92}},
+ {id:'streets',type:'symbol',source:SRC,'source-layer':'transportation_name',minzoom:14,layout:{'symbol-placement':'line','text-field':['coalesce',['get','name:latin'],['get','name']],'text-font':['Noto Sans Regular'],'text-size':11},paint:{'text-color':'#4b5565','text-halo-color':'#fff','text-halo-width':1.5}},
+ {id:'places',type:'symbol',source:SRC,'source-layer':'place',filter:['in',['get','class'],['literal',['city','suburb','neighbourhood','quarter']]],layout:{'text-field':['coalesce',['get','name:latin'],['get','name']],'text-font':['Noto Sans Regular'],'text-size':13},paint:{'text-color':'#2b3340','text-halo-color':'#fff','text-halo-width':1.8}}
+ ]};
+const map=new maplibregl.Map({container:'map',style:STYLE,center:[-73.99,40.735],zoom:14.6,pitch:62,bearing:-25,maxPitch:85,attributionControl:{compact:true}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-right');
+let errShown=0;
+map.on('error',e=>{const m=(e.error&&e.error.message)||'';if(/fetch|network|load failed|failed/i.test(m)&&!errShown++)fail('Carte : impossible de charger les données ('+m+'). Les tuiles OpenFreeMap sont peut-être bloquées par ton réseau, un bloqueur de pub ou l’aperçu du chat.')});
+
+map.on('load',()=>{
+  // Bâtiments 3D extrudés depuis les données OpenStreetMap (hauteurs réelles quand disponibles)
+  const src=Object.keys(map.getStyle().sources).find(s=>map.getSource(s).type==='vector');
+  if(!map.getLayer('building-3d')){
+    map.addLayer({id:'building-3d',type:'fill-extrusion',source:src,'source-layer':'building',minzoom:13,
+      paint:{'fill-extrusion-color':'#d9dde6','fill-extrusion-height':['coalesce',['get','render_height'],10],'fill-extrusion-base':['coalesce',['get','render_min_height'],0],'fill-extrusion-opacity':.92}});
+  } else {
+    map.setPaintProperty('building-3d','fill-extrusion-opacity',.92);
+    map.setLayerZoomRange('building-3d',13,24);
+  }
+});
+
+const markers=[],active=new Set(Object.keys(CATS));
+function pin(p,extra){
+  const c=CATS[p.cat],el=document.createElement('div');
+  el.className='pin'+(p.ok?'':' unv');el.style.setProperty('--c',c[2]);el.innerHTML='<i>'+c[0]+'</i>';
+  const m=new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat([p.lng,p.lat]).addTo(map);
+  p.el=el;p.m=m;
+  el.addEventListener('click',e=>{e.stopPropagation();show(p)});
+  markers.push(p);return p;
+}
+function popupHtml(p,i){
+  const q=encodeURIComponent(p.name+' New York');
+  const gm=p.ok?`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`:`https://www.google.com/maps/search/?api=1&query=${q}`;
+  return `<div class="pop"><h3>${CATS[p.cat][0]} ${p.name}</h3><small>${p.q||''} · ${CATS[p.cat][1]}</small>
+  <p>${p.desc||''}</p>
+  ${p.addr?`<p>📍 ${p.addr}</p>`:''}
+  <p class="${p.ok?'':'warn'}">${p.ok?'✔ Position vérifiée':'⚠ Position approximative — à vérifier'}</p>
+  <a href="${gm}" target="_blank" rel="noopener">Google Maps</a><button onclick="editPos(${i})">✏️ Corriger</button><button onclick="addToDay(${i})">+ Journée</button><button onclick="setA(${i})">Départ A</button><button onclick="routeAB(${i})">Aller ici</button>${p.ok?'':`<button onclick="verify(${i})">Vérifier</button>`}</div>`;
+}
+let pop;
+function show(p){
+  const i=markers.indexOf(p);pop&&pop.remove();
+  pop=new maplibregl.Popup({offset:38,maxWidth:'300px'}).setLngLat([p.lng,p.lat]).setHTML(popupHtml(p,i)).addTo(map);
+  map.flyTo({center:[p.lng,p.lat],zoom:Math.max(map.getZoom(),16.2),pitch:65,duration:1600,essential:true});
+}
+async function verify(i){
+  const p=markers[i];
+  const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&viewbox=-74.26,40.92,-73.70,40.49&bounded=1&q='+encodeURIComponent((typeof GQ!=='undefined'&&GQ[p.name])||p.geoq||p.name));
+  const j=await r.json();
+  if(!j.length){alert('Introuvable dans OpenStreetMap : lieu à vérifier à la main.');return}
+  p.lat=+j[0].lat;p.lng=+j[0].lon;p.addr=j[0].display_name.split(',').slice(0,3).join(',');p.ok=true;
+  p.m.setLngLat([p.lng,p.lat]);p.el.classList.remove('unv');show(p);
+}
+window.verify=verify;
+
+P.forEach(a=>pin({name:a[0],cat:a[1],lat:a[2],lng:a[3],q:a[4],desc:a[5],ok:false}));
+
+// Filtres
+const chips=document.getElementById('chips');
+Object.entries(CATS).forEach(([k,c])=>{
+  const b=document.createElement('button');b.className='chip';b.textContent=c[0]+' '+c[1];
+  b.onclick=()=>{active.has(k)?active.delete(k):active.add(k);b.classList.toggle('off',!active.has(k));
+    markers.forEach(p=>p.el.style.display=active.has(p.cat)?'':'none')};
+  chips.appendChild(b);
+});
+
+// Recherche des lieux sans position (toutes les succursales)
+const todo=document.getElementById('todo');
+todo.innerHTML='<b>À localiser</b><p style="opacity:.7">Touchez pour chercher toutes les adresses réelles à New York dans OpenStreetMap.</p>';
+TODO.forEach(t=>{
+  const b=document.createElement('button');b.textContent=CATS[t[1]][0]+' '+t[0];
+  b.onclick=async()=>{
+    b.textContent='… '+t[0];
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=8&addressdetails=0&viewbox=-74.26,40.92,-73.70,40.49&bounded=1&q='+encodeURIComponent(t[0].replace(/ \(.*\)/,'')));
+    const j=await r.json();b.textContent=CATS[t[1]][0]+' '+t[0]+' — '+(j.length?j.length+' trouvé(s) ✔':'aucun résultat, à vérifier');
+    j.forEach(x=>pin({name:t[0],cat:t[1],lat:+x.lat,lng:+x.lon,q:'New York',addr:x.display_name.split(',').slice(0,3).join(','),desc:'',ok:true}));
+    if(j.length){const bb=new maplibregl.LngLatBounds();j.forEach(x=>bb.extend([+x.lon,+x.lat]));map.fitBounds(bb,{padding:80,maxZoom:15,pitch:55,duration:1500})}
+    todo.style.display='none';
+  };todo.appendChild(b);
+});
+bTodo.onclick=()=>todo.style.display=todo.style.display==='block'?'none':'block';
+bMan.onclick=()=>map.flyTo({center:[-73.985,40.758],zoom:14.8,pitch:65,bearing:-28,duration:2500});
+bBk.onclick=()=>map.flyTo({center:[-73.985,40.698],zoom:14.6,pitch:65,bearing:20,duration:2500});
+bNight.onclick=()=>{const n=document.body.classList.toggle('night');bNight.textContent=n?'☀️ Jour':'🌙 Nuit'};
+
+// ===== ÉTAPE 2 : voyage, journées, itinéraires, réservations =====
+const ST={ok:['Réservé','#34d399'],bk:['À réserver','#fb7185'],chk:['À vérifier','#facc15'],free:['Gratuit','#38bdf8']};
+const STATUS={'Barclays Center':'ok','9/11 Museum':'bk','SUMMIT One Vanderbilt':'bk','Hélicoptère (Downtown Heliport)':'bk','Broadway — spectacle':'bk','Winter Village Bryant Park':'chk','Pier 57 Rooftop':'chk','Ferry East River (Pier 11)':'chk','Central Park':'free','High Line':'free','Staten Island Ferry (Whitehall)':'free','Manhattan Bridge':'free','Brooklyn Bridge — lever du soleil':'free','Strawberry Fields':'free','Charging Bull':'free','Times Square':'free','9/11 Memorial':'free','Chelsea Market':'free'};
+const EXTRA={13:[['Shopping 5e Avenue','chk']],14:[['Restaurant de la Saint-Valentin','bk']],15:[['Restaurant d’anniversaire','bk']],18:[['Shopping SoHo / Little Italy','chk']],20:[['Bar jazz','bk']]};
+const DAYS=[
+[12,'Ven 12 fév','Arrivée & Chelsea',['Chelsea Market','High Line','Pier 57 Rooftop']],
+[13,'Sam 13 fév','Midtown, 5th Avenue & SUMMIT',['St. Patrick’s Cathedral','Rockefeller Center','Trump Tower','New York Public Library','Grand Central Terminal','SUMMIT One Vanderbilt','Times Square','Midnight Moment (Times Square)']],
+[14,'Dim 14 fév','Saint-Valentin, Upper East Side & Central Park',['Marches du MET','Constance Billard (Sacred Heart)','Bethesda Terrace','Strawberry Fields','Vélo Central Park (Columbus Circle)','Empire Hotel']],
+[15,'Lun 15 fév','Anniversaire, Downtown Manhattan',['Charging Bull','9/11 Memorial','9/11 Museum','Staten Island Ferry (Whitehall)','Hélicoptère (Downtown Heliport)']],
+[16,'Mar 16 fév','Brooklyn Bridge & DUMBO',['Brooklyn Bridge — lever du soleil','DUMBO (Washington Street)','Manhattan Bridge','Brooklyn Bridge Park — coucher du soleil']],
+[17,'Mer 17 fév','Brooklyn & match au Barclays Center',['Ferry East River (Pier 11)','Barclays Center']],
+[18,'Jeu 18 fév','SoHo, Chinatown, Little Italy & Friends',['Friends — 90 Bedford Street','Chinatown']],
+[19,'Ven 19 fév','Roosevelt Island & Williamsburg',['Téléphérique de Roosevelt Island','Williamsburg','Domino Park — coucher du soleil']],
+[20,'Sam 20 fév','Musée, Flatiron & Broadway',['American Museum of Natural History','Flatiron Building','230 Fifth Rooftop','Broadway — spectacle']],
+[21,'Dim 21 fév','Départ',[]]
+];
+DAYS.forEach(d=>d.pl=d[3].map(n=>markers.find(p=>p.name===n)).filter(Boolean));
+let cur=null,mode='foot',A=null;
+const RP={foot:'routed-foot',bike:'routed-bike',car:'routed-car'};
+const side=document.getElementById('side'),toastEl=document.getElementById('toast');
+if(innerWidth<700)side.classList.add('hide');
+const toast=t=>{toastEl.textContent=t;toastEl.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>toastEl.style.display='none',5000)};
+const badge=k=>k?`<span style="background:${ST[k][1]};color:#000;border-radius:6px;padding:1px 6px;font-size:11px">${ST[k][0]}</span>`:'';
+const fmt=(m,s)=>(m>=1000?(m/1000).toFixed(1)+' km':Math.round(m)+' m')+' · '+Math.max(1,Math.round(s/60))+' min';
+function fit(pts){
+  if(!pts.length)return;const b=new maplibregl.LngLatBounds();pts.forEach(p=>b.extend([p.lng,p.lat]));
+  map.fitBounds(b,{padding:{top:120,bottom:100,left:innerWidth>700?340:40,right:40},maxZoom:16,pitch:60,bearing:-20,duration:2200});
+}
+async function getRoute(pts){
+  const c=pts.map(p=>p.lng+','+p.lat).join(';');
+  const r=await fetch(`https://routing.openstreetmap.de/${RP[mode]}/route/v1/driving/${c}?overview=full&geometries=geojson`);
+  const j=await r.json();if(!j.routes||!j.routes.length)throw 0;return j.routes[0];
+}
+function draw(geo){
+  const fc={type:'Feature',geometry:geo||{type:'LineString',coordinates:[]}};
+  if(map.getSource('route')){map.getSource('route').setData(fc);return}
+  map.addSource('route',{type:'geojson',data:fc});
+  map.addLayer({id:'route-glow',type:'line',source:'route',paint:{'line-color':'#6ee7ff','line-width':12,'line-opacity':.25,'line-blur':6}});
+  map.addLayer({id:'route',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#00c2ff','line-width':4.5}});
+}
+function renderSide(msg){
+  if(cur==null){
+    side.innerHTML='<h4>Programme du voyage</h4>'+DAYS.map((d,i)=>`<button onclick="selDay(${i})"><b>${d[1]}</b><br><small>${d[2]}</small></button>`).join('')+'<button onclick="allTrip()">🌍 TOUT LE VOYAGE</button>';return;
+  }
+  const d=DAYS[cur];
+  side.innerHTML=`<button onclick="back()">← Journées</button><h4>${d[1]} · ${d[2]}</h4>
+  <div>${[['foot','🚶'],['bike','🚴'],['car','🚗']].map(x=>`<span class="chip ${mode==x[0]?'':'off'}" onclick="setMode('${x[0]}')">${x[1]}</span>`).join(' ')} <small style="opacity:.6">métro/ferry : bientôt</small></div>
+  ${d.pl.map((p,j)=>`<div class="it"><span onclick="show(markers[${markers.indexOf(p)}])"><b>${j+1}.</b> ${CATS[p.cat][0]} ${p.name} ${badge(STATUS[p.name])}</span><span><u onclick="mv(${j},-1)">↑</u><u onclick="mv(${j},1)">↓</u><u onclick="rm(${j})">✕</u></span></div>`).join('')}
+  ${(EXTRA[d[0]]||[]).map(x=>`<div class="it"><span>📝 ${x[0]} ${badge(x[1])}</span></div>`).join('')}
+  <button onclick="dayRoute()">▶ JOURNÉE COMPLÈTE</button><div id="rinfo">${msg||''}</div>`;
+}
+function dim(list){markers.forEach(p=>p.el.style.opacity=!list||list.includes(p)?1:.22)}
+function selDay(i){cur=i;const d=DAYS[i];dim(d.pl);renderSide();fit(d.pl);dayRoute()}
+function back(){cur=null;dim(null);draw(null);renderSide()}
+function allTrip(){cur=null;dim(null);draw(null);renderSide();fit(markers)}
+function setMode(m){mode=m;dayRoute()}
+function mv(j,dx){const a=DAYS[cur].pl,k=j+dx;if(k<0||k>=a.length)return;[a[j],a[k]]=[a[k],a[j]];dayRoute()}
+function rm(j){DAYS[cur].pl.splice(j,1);dayRoute()}
+function addToDay(i){
+  if(cur==null)return toast('Choisis d’abord une journée dans le programme.');
+  const a=DAYS[cur].pl;if(!a.includes(markers[i]))a.push(markers[i]);dayRoute();
+}
+async function dayRoute(){
+  if(cur==null)return;const pl=DAYS[cur].pl;dim(pl);
+  if(pl.length<2){draw(null);return renderSide('Ajoute au moins 2 lieux pour calculer un trajet.')}
+  renderSide('Calcul du trajet…');
+  try{
+    const r=await getRoute(pl);draw(r.geometry);
+    const legs=r.legs.map((l,j)=>`${j+1} → ${j+2} : ${fmt(l.distance,l.duration)}`).join('<br>');
+    renderSide(`<b>Total : ${fmt(r.distance,r.duration)}</b><br>${legs}`);
+  }catch(e){renderSide('Itinéraire indisponible pour ce mode (service gratuit, peut être saturé).')}
+}
+function setA(i){A=markers[i];toast('Départ : '+A.name+'. Ouvre un autre lieu puis « Aller ici ».')}
+async function routeAB(i){
+  if(!A)return toast('Choisis d’abord « Départ A » sur un autre lieu.');
+  try{const r=await getRoute([A,markers[i]]);draw(r.geometry);fit([A,markers[i]]);
+    toast(`${A.name} → ${markers[i].name} : ${fmt(r.distance,r.duration)} (${{foot:'à pied',bike:'à vélo',car:'en voiture'}[mode]})`)}
+  catch(e){toast('Itinéraire indisponible.')}
+}
+function resPanel(){
+  side.classList.remove('hide');
+  const rows=[];
+  Object.entries(STATUS).forEach(([n,k])=>rows.push([k,n]));
+  Object.values(EXTRA).flat().forEach(x=>rows.push([x[1],x[0]]));
+  rows.push(['chk','Rooftop si nécessaire']);
+  const order=['ok','bk','chk','free'];rows.sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0]));
+  side.innerHTML='<button onclick="back()">← Journées</button><h4>Réservations</h4>'+rows.map(r=>`<div class="it"><span>${r[1]}</span>${badge(r[0])}</div>`).join('');
+}
+bProg.onclick=()=>{side.classList.toggle('hide');if(!side.classList.contains('hide')&&cur==null)renderSide()};
+bRes.onclick=resPanel;
+renderSide();
+
+// ===== ÉTAPE 3 : immersion =====
+// Intro cinématique
+map.jumpTo({center:[-73.97,40.73],zoom:11.3,pitch:0,bearing:0});
+setTimeout(()=>map.flyTo({center:[-73.99,40.735],zoom:14.6,pitch:62,bearing:-25,duration:5000,essential:true}),700);
+setTimeout(()=>{try{if(!map.isSourceLoaded('ofm'))fail('Les données de carte ne se chargent pas. Cet aperçu (Fichiers / Quick Look) bloque la 3D : ouvre la page dans Safari ou Chrome, ou héberge-la en ligne.')}catch(e){}},9000);
+
+let lastGeo=null,tourOn=false,anim=0,spin=0,dot=null;
+const _draw=draw;draw=function(g){lastGeo=g;_draw(g)};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function startSpin(){stopSpin();const f=()=>{map.setBearing(map.getBearing()+.06);spin=requestAnimationFrame(f)};spin=requestAnimationFrame(f)}
+function stopSpin(){cancelAnimationFrame(spin);spin=0}
+function stopAll(){tourOn=false;cancelAnimationFrame(anim);if(dot){dot.remove();dot=null}stopSpin()}
+['mousedown','touchstart','wheel'].forEach(e=>map.getCanvas().addEventListener(e,stopAll,{passive:true}));
+
+// Visite guidée : la caméra enchaîne les lieux de la journée
+async function tour(){
+  if(cur==null)return toast('Choisis d’abord une journée dans le programme.');
+  const pl=DAYS[cur].pl.slice();if(!pl.length)return;
+  stopAll();tourOn=true;side.classList.add('hide');
+  for(let j=0;j<pl.length;j++){
+    if(!tourOn)return;const p=pl[j];show(p);
+    map.flyTo({center:[p.lng,p.lat],zoom:16.6,pitch:68,bearing:(j*47)%360-60,duration:3500,essential:true});
+    await sleep(6500);
+  }
+  if(tourOn){tourOn=false;if(pop)pop.remove();toast('Fin de la visite.');fit(pl)}
+}
+
+// Animation le long du trajet de la journée (ou du dernier trajet A → B)
+function follow(){
+  if(!lastGeo||!lastGeo.coordinates.length)return toast('Calcule d’abord un trajet : choisis une journée ou utilise « Départ A » / « Aller ici ».');
+  stopAll();if(pop)pop.remove();side.classList.add('hide');
+  const c=lastGeo.coordinates,n=c.length,dur=Math.min(45000,Math.max(12000,n*60));
+  dot=new maplibregl.Marker({element:Object.assign(document.createElement('div'),{className:'dot'})}).setLngLat(c[0]).addTo(map);
+  const t0=performance.now();let br=map.getBearing();
+  const step=now=>{
+    const f=Math.min(1,(now-t0)/dur),i=Math.min(n-2,Math.floor(f*(n-1))),a=c[i],b=c[i+1],u=f*(n-1)-i;
+    const pos=[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];dot.setLngLat(pos);
+    const tg=Math.atan2(b[0]-a[0],b[1]-a[1])*180/Math.PI,d=((tg-br+540)%360)-180;br+=d*.04;
+    map.jumpTo({center:pos,bearing:br,pitch:70,zoom:17});
+    if(f<1)anim=requestAnimationFrame(step);else{toast('Arrivée !');anim=0}
+  };
+  anim=requestAnimationFrame(step);
+}
+
+// Mode exploration : interface masquée, caméra qui tourne doucement
+function explore(){
+  const on=document.body.classList.toggle('explore');bExplore.textContent=on?'✖ Quitter':'🧭 Exploration';
+  stopAll();if(pop)pop.remove();
+  if(on){map.flyTo({center:[-73.985,40.752],zoom:15.4,pitch:72,duration:3000});setTimeout(()=>{if(document.body.classList.contains('explore'))startSpin()},3200)}
+}
+
+// Modes thématiques
+function view(keys,test){
+  active.clear();keys.forEach(k=>active.add(k));if(pop)pop.remove();
+  const ks=Object.keys(CATS);[...chips.children].forEach((b,i)=>b.classList.toggle('off',!active.has(ks[i])));
+  const vis=[];markers.forEach(p=>{const ok=active.has(p.cat)&&(!test||test(p));p.el.style.display=ok?'':'none';if(ok)vis.push(p)});
+  dim(null);if(vis.length&&keys.length<10||test)fit(vis);
+}
+const all=Object.keys(CATS),modes=document.createElement('div');modes.id='modes';
+[['✨ Tout',()=>view(all)],['🍔 Food',()=>view(['f'])],['📸 Photo',()=>view(['p'])],['🎬 Gossip Girl & Friends',()=>view(['t'])],['🌅 Soleil',()=>view(all,p=>/lever|coucher/.test(p.name))]]
+  .forEach(m=>{const b=document.createElement('button');b.className='chip';b.textContent=m[0];b.onclick=m[1];modes.appendChild(b)});
+document.getElementById('top').appendChild(modes);
+
+bTour.onclick=tour;bFollow.onclick=follow;bExplore.onclick=explore;
+
+// ===== ÉTAPE 4 : horaires, satellite, budget =====
+// Heures et prix saisis par toi, mémorisés dans ce navigateur (rien n'est pré-rempli)
+let S={};try{S=JSON.parse(localStorage.getItem('ny3d')||'{}')}catch(e){}
+const save=()=>{try{localStorage.setItem('ny3d',JSON.stringify(S))}catch(e){}};
+const xcat=l=>/Restaurant/.test(l)?'f':/Shopping/.test(l)?'s':'d';
+const entries=di=>{const d=DAYS[di];return d.pl.map(p=>({key:p.name,label:p.name,cat:p.cat,st:STATUS[p.name]})).concat((EXTRA[d[0]]||[]).map(x=>({key:'x:'+x[0],label:x[0],cat:xcat(x[0]),st:x[1]})))};
+const val=e=>S[e.key]||{};
+const money=n=>'$'+(Math.round(n*100)/100).toLocaleString('fr-FR');
+const dayTotal=di=>entries(di).reduce((s,e)=>s+(+val(e).pr||0),0);
+const IN='flex:1;min-width:0;background:#ffffff12;border:1px solid #ffffff25;border-radius:6px;color:#fff;padding:5px;font-size:12px';
+const updTot=()=>{const e=document.getElementById('dtot');if(e)e.textContent='💰 Budget du jour : '+money(dayTotal(cur))};
+function decorate(){
+  const es=entries(cur);
+  [...side.querySelectorAll('.it')].forEach((r,k)=>{
+    const e=es[k];if(!e)return;const v=val(e),x=document.createElement('div');
+    x.style.cssText='width:100%;display:flex;gap:6px;margin-top:4px';
+    x.innerHTML=`<input type="time" value="${v.t||''}" onchange="setF(${k},'t',this.value)" style="${IN}"><input type="number" min="0" step="any" placeholder="$ prix" value="${v.pr==null?'':v.pr}" onchange="setF(${k},'pr',this.value)" style="${IN}">`;
+    r.appendChild(x);
+  });
+  const ri=document.getElementById('rinfo'),t=document.createElement('div');
+  t.innerHTML='<button onclick="sortDay()">⏱ Trier par heure</button><div id="dtot" style="margin:6px 0"></div>';
+  ri.parentNode.insertBefore(t,ri);updTot();
+}
+const _rs=renderSide;renderSide=function(m){_rs(m);if(cur!=null)decorate()};
+function setF(k,f,v){const e=entries(cur)[k],o=S[e.key]=S[e.key]||{};o[f]=f==='pr'?(v===''?null:+v):v;save();updTot()}
+function sortDay(){const k=p=>(S[p.name]||{}).t||'99:99';DAYS[cur].pl.sort((a,b)=>k(a).localeCompare(k(b)));dayRoute()}
+
+// Fenêtre plein écran (calendrier / budget)
+const ov=document.createElement('div');ov.id='ov';document.body.appendChild(ov);
+const closeB=`<button class="btn" style="position:sticky;top:0;float:right" onclick="document.getElementById('ov').classList.remove('on')">✖ Fermer</button>`;
+function cal(){
+  const body=DAYS.map((d,i)=>{
+    const es=entries(i).map((e,k)=>({e,k})).sort((a,b)=>(val(a.e).t||'99:99').localeCompare(val(b.e).t||'99:99'));
+    return `<div class="card"><h4>${d[1]} · ${d[2]}</h4>${es.map(({e,k})=>`<div class="row"><span>${CATS[e.cat][0]} ${e.label} ${badge(e.st)}</span><input type="time" value="${val(e).t||''}" onchange="calSet(${i},${k},this.value)"></div>`).join('')||'<small>Aucune activité prévue</small>'}<button class="btn" style="margin-top:8px" onclick="goDay(${i})">Ouvrir sur la carte</button></div>`}).join('');
+  ov.innerHTML=closeB+'<h3>🗓 Calendrier · 12 → 21 février</h3><p style="opacity:.7;font-size:13px">Saisis les heures ici : elles se classent par ordre chronologique.</p><div class="grid">'+body+'</div>';ov.classList.add('on');
+}
+function calSet(i,k,v){const e=entries(i)[k],o=S[e.key]=S[e.key]||{};o.t=v;save();cal()}
+function goDay(i){ov.classList.remove('on');side.classList.remove('hide');selDay(i)}
+function budget(){
+  const cats={};let tot=0,miss=0;
+  const rows=DAYS.map((d,i)=>{
+    const s=entries(i).reduce((a,e)=>{const p=val(e).pr;if(p==null||p==='')miss++;else{a+=+p;cats[e.cat]=(cats[e.cat]||0)+ +p}return a},0);
+    tot+=s;return `<div class="row"><span>${d[1]} · ${d[2]}</span><b>${money(s)}</b></div>`}).join('');
+  const cr=Object.entries(cats).map(([k,v])=>`<div class="row"><span>${CATS[k][0]} ${CATS[k][1]}</span><b>${money(v)}</b></div>`).join('')||'<small>Aucun prix saisi</small>';
+  ov.innerHTML=closeB+`<h3>💰 Budget prévisionnel</h3><p style="opacity:.7;font-size:13px">Saisis un prix par activité dans chaque journée (total pour vous deux). Rien n’est pré-rempli : je ne connais pas les tarifs réels.</p><div class="grid"><div class="card"><h4>Par journée</h4>${rows}<div class="row"><b>TOTAL</b><b>${money(tot)}</b></div><small>${miss} activité(s) sans prix saisi</small></div><div class="card"><h4>Par catégorie</h4>${cr}</div></div>`;ov.classList.add('on');
+}
+
+// Satellite (Esri World Imagery) sous les bâtiments 3D
+bSat.onclick=()=>{
+  const on=document.body.classList.toggle('sat');bSat.textContent=on?'🗺 Plan':'🛰 Satellite';
+  if(on&&!map.getSource('sat')){
+    map.addSource('sat',{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,attribution:'Imagery © Esri'});
+    map.addLayer({id:'sat',type:'raster',source:'sat'},map.getLayer('building-3d')?'building-3d':undefined);
+  }
+  if(map.getLayer('sat'))map.setLayoutProperty('sat','visibility',on?'visible':'none');
+  if(map.getLayer('building-3d')){map.setPaintProperty('building-3d','fill-extrusion-opacity',on?.55:.92);map.setPaintProperty('building-3d','fill-extrusion-color',on?'#ffffff':'#d9dde6')}
+};
+bCal.onclick=cal;bBud.onclick=budget;
+function backup(){
+  ov.innerHTML=closeB+'<h3>💾 Sauvegarde</h3><p style="opacity:.7;font-size:13px">Ce texte contient tes heures et tes prix. Copie-le et garde-le dans une note. Pour restaurer sur un autre appareil ou une autre adresse, colle-le ici à la place, puis touche « Importer ».</p><textarea id="bk" style="width:100%;height:180px;background:#ffffff12;color:#fff;border:1px solid #ffffff30;border-radius:8px;padding:8px;font-size:12px"></textarea><div style="margin-top:8px"><button class="btn" onclick="copyBk()">📋 Copier</button> <button class="btn" onclick="impBk()">⬇ Importer</button></div>';
+  document.getElementById('bk').value=JSON.stringify(S);ov.classList.add('on');
+}
+function copyBk(){const t=document.getElementById('bk');t.select();try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand('copy')}toast('Copié.')}
+function impBk(){
+  try{const o=JSON.parse(document.getElementById('bk').value);if(!o||typeof o!=='object'||Array.isArray(o))throw 0;S=o;save();toast('Sauvegarde importée.');if(cur!=null)renderSide()}
+  catch(e){toast('Texte invalide : colle exactement le texte copié.')}
+}
+bSave.onclick=backup;
+
+// ===== ÉTAPE 5 : hôtel, position, food proche, spots photo, bars jazz, métro, hors ligne =====
+const HOTEL=markers.find(p=>p.cat==='h');
+HOTEL.geoq='140 West 28th Street, New York';HOTEL.addr='140 West 28th Street, New York, NY 10001';
+STATUS['Top of the Rock']='chk';STATUS['Edge (Hudson Yards)']='chk';
+
+// Spots photo (positions à vérifier avec le bouton « Vérifier »)
+[['Pebble Beach (Brooklyn Bridge Park)',40.7038,-73.9948,'DUMBO','Cadrage sous le Brooklyn Bridge, skyline de Lower Manhattan. Angle : vers le nord-ouest.'],
+ ['Brooklyn Heights Promenade',40.6963,-73.9972,'Brooklyn Heights','Vue dégagée sur Lower Manhattan et le Brooklyn Bridge. Angle : vers l’ouest.'],
+ ['Top of the Rock',40.7593,-73.9793,'Midtown','Vue qui inclut l’Empire State Building. Angle : vers le sud.'],
+ ['Pier 17 (Seaport)',40.7060,-74.0013,'Seaport','Vue sur le Brooklyn Bridge depuis le toit. Angle : vers le nord-est.'],
+ ['Edge (Hudson Yards)',40.7537,-74.0012,'Hudson Yards','Plateforme extérieure. À tenter au coucher du soleil.'],
+ ['Bow Bridge (Central Park)',40.7765,-73.9715,'Central Park','Pont en fonte avec les immeubles de l’Upper West Side derrière.'],
+ ['Little Island',40.7421,-74.0100,'Chelsea','Parc sur l’Hudson, couchers de soleil face à l’ouest.']
+].forEach(a=>pin({name:a[0],cat:'p',lat:a[1],lng:a[2],q:a[3],desc:a[4]+' (position à vérifier)',ok:false}));
+
+// 5 bars de jazz (positions et tarifs à vérifier)
+[['Smalls Jazz Club',40.7343,-74.0027,'West Village','183 W 10th St. Speakeasy hard bop. Plutôt cher (≈ 25 à 40 $).'],
+ ['Mezzrow',40.7343,-74.0021,'West Village','163 W 10th St. Salon piano à la bougie, idéal Saint-Valentin.'],
+ ['Zinc Bar',40.7308,-74.0005,'Greenwich Village','82 W 3rd St. Speakeasy, coin bar parfois sans cover.'],
+ ['Cellar Dog',40.7337,-74.0033,'West Village','75 Christopher St (ex-Fat Cat). Décontracté, abordable.'],
+ ["Arthur's Tavern",40.7328,-74.0036,'West Village','57 Grove St. Jazz de quartier. Adresse à vérifier.']
+].forEach(a=>pin({name:a[0],cat:'d',lat:a[1],lng:a[2],q:a[3],desc:a[4]+' Prix à vérifier.',ok:false}));
+
+const byName=n=>markers.find(p=>p.name===n);
+const setDay=(i,names)=>{DAYS[i].pl=names.map(byName).filter(Boolean)};
+setDay(0,['Chelsea Market','Pier 57 Rooftop','Little Island','High Line','Edge (Hudson Yards)']);
+setDay(1,['St. Patrick’s Cathedral','Rockefeller Center','Top of the Rock','Trump Tower','New York Public Library','Grand Central Terminal','SUMMIT One Vanderbilt','Times Square','Midnight Moment (Times Square)']);
+setDay(2,['Marches du MET','Constance Billard (Sacred Heart)','Bethesda Terrace','Bow Bridge (Central Park)','Strawberry Fields','Vélo Central Park (Columbus Circle)','Empire Hotel']);
+setDay(3,['Charging Bull','9/11 Memorial','9/11 Museum','Pier 17 (Seaport)','Staten Island Ferry (Whitehall)','Hélicoptère (Downtown Heliport)']);
+setDay(4,['Brooklyn Bridge — lever du soleil','DUMBO (Washington Street)','Manhattan Bridge','Pebble Beach (Brooklyn Bridge Park)','Brooklyn Heights Promenade','Brooklyn Bridge Park — coucher du soleil']);
+setDay(6,['Chinatown','Zinc Bar','Friends — 90 Bedford Street','Mezzrow']);
+
+// Départ de l'hôtel, retour par défaut, ou départ depuis ma position
+let startMode='hotel',retH=true,userPos=null,foodMk=[];
+const geo=new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true},trackUserLocation:true,showUserLocation:true});
+map.addControl(geo,'top-right');
+geo.on('geolocate',e=>{const first=!userPos;userPos=[e.coords.longitude,e.coords.latitude];if(first&&startMode==='gps'&&cur!=null)dayRoute()});
+const dist=(a,b)=>Math.hypot((a.lng-b.lng)*Math.cos(a.lat*Math.PI/180)*111320,(a.lat-b.lat)*110540);
+const needPos=()=>{toast('Autorise la localisation : touche aussi le bouton ◎ en haut à droite.');try{geo.trigger()}catch(e){}};
+function routePts(){
+  const pl=DAYS[cur].pl;if(!pl.length)return [HOTEL];
+  const s=startMode==='gps'&&userPos?{name:'Ma position',lat:userPos[1],lng:userPos[0]}:HOTEL;
+  return retH?[s,...pl,HOTEL]:[s,...pl];
+}
+const shortN=a=>a===HOTEL?'🏨 Hôtel':(a.name.length>24?a.name.slice(0,24)+'…':a.name);
+dayRoute=async function(){
+  if(cur==null)return;const pl=DAYS[cur].pl;dim(pl.concat(HOTEL));
+  const pts=routePts();
+  if(pts.length<2){draw(null);return renderSide(DAYS[cur][0]===21?'Jour du départ : retour à l’hôtel, puis direction aéroport ou gare.':'Ajoute au moins un lieu.')}
+  renderSide('Calcul du trajet…');
+  try{
+    const r=await getRoute(pts),em={foot:'🚶',bike:'🚴',car:'🚗'}[mode];draw(r.geometry);
+    const legs=r.legs.map((l,j)=>{const a=pts[j],b=pts[j+1];
+      const g=`https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${b.lat},${b.lng}&travelmode=transit`;
+      const adv=mode==='foot'?(l.duration/60<15?' · <b>à pied (gratuit)</b>':' · <b>métro conseillé</b>'):'';
+      return `${shortN(a)} → ${shortN(b)}<br>${em} ${fmt(l.distance,l.duration)} · <a href="${g}" target="_blank" rel="noopener" style="color:#6ee7ff">🚇 Métro</a>${adv}`}).join('<hr style="border:0;border-top:1px solid #ffffff18">');
+    renderSide(`<b>Total : ${fmt(r.distance,r.duration)}</b><br>${legs}<p style="opacity:.7;font-size:12px">Métro : 3,00 $ par trajet en tap-and-ride (carte sans contact ou téléphone), 3,50 $ le ticket papier, plafonné à 35 $ sur 7 jours (source : mta.info). Marcher est gratuit.</p>`);
+  }catch(e){renderSide('Itinéraire indisponible (service gratuit parfois saturé).')}
+};
+const _rs3=renderSide;renderSide=function(m){_rs3(m);if(cur==null)return;
+  const ri=document.getElementById('rinfo');if(!ri)return;const t=document.createElement('div');
+  t.innerHTML=`<div style="margin:6px 0">Départ : <span class="chip ${startMode==='hotel'?'':'off'}" onclick="setStart('hotel')">🏨 Hôtel</span> <span class="chip ${startMode==='gps'?'':'off'}" onclick="setStart('gps')">📍 Ma position</span> <span class="chip ${retH?'':'off'}" onclick="toggleRet()">↩ Retour hôtel</span></div><button onclick="nearest()">🧭 De ma position vers le lieu le plus proche</button><button onclick="foodMe()">🍔 Food près de moi</button>`;
+  ri.parentNode.insertBefore(t,ri)};
+function setStart(m){startMode=m;if(m==='gps'&&!userPos)needPos();dayRoute()}
+function toggleRet(){retH=!retH;dayRoute()}
+function nearest(){
+  if(cur==null)return toast('Choisis d’abord une journée.');
+  if(!userPos)return needPos();
+  const me={name:'Ma position',lat:userPos[1],lng:userPos[0]},pl=DAYS[cur].pl;if(!pl.length)return;
+  const t=pl.reduce((a,b)=>dist(me,a)<dist(me,b)?a:b);
+  getRoute([me,t]).then(r=>{draw(r.geometry);fit([me,t]);toast('Vers '+t.name+' : '+fmt(r.distance,r.duration))}).catch(()=>toast('Itinéraire indisponible.'));
+}
+
+// Food : uniquement tes adresses, à moins de 400 m du programme (ou 600 m autour de moi)
+const FOOD_RE="Mimi|Levain|Crumbl|Gnocchi|Shake Shack|Apollo Bagels|Leon.s Bagels|Ray.s (Famous )?Pizza|Raising Cane|McDonald|Wendy|Chick-fil-A|Arthur (&|and) Sons|^KEA|Pasta de Pasta|Joe (&|and) The Juice";
+function clearFood(){foodMk.forEach(p=>{p.m.remove();const i=markers.indexOf(p);if(i>-1)markers.splice(i,1)});foodMk=[]}
+async function foodAround(pts,r){
+  clearFood();if(!pts.length)return;
+  const q='[out:json][timeout:25];('+pts.map(p=>`nwr["name"~"${FOOD_RE}",i](around:${r},${p.lat},${p.lng});`).join('')+');out center 80;';
+  try{
+    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});
+    const j=await res.json(),seen=new Set();
+    (j.elements||[]).forEach(el=>{
+      const lat=el.lat!=null?el.lat:el.center&&el.center.lat,lng=el.lon!=null?el.lon:el.center&&el.center.lon,k=el.type+el.id;
+      if(lat==null||seen.has(k))return;seen.add(k);
+      const t=el.tags||{},addr=[t['addr:housenumber'],t['addr:street']].filter(Boolean).join(' '),near=Math.round(Math.min(...pts.map(p=>dist(p,{lat,lng}))));
+      foodMk.push(pin({name:t.name||'Restaurant',cat:'f',lat,lng,q:t['addr:suburb']||'',addr:addr||'adresse à vérifier',desc:`À environ ${near} m du point de recherche.`,ok:true}));
+    });
+    toast(foodMk.length?foodMk.length+' adresse(s) food trouvée(s) à proximité.':'Aucune de tes adresses food à proximité.');
+  }catch(e){toast('Recherche des restaurants indisponible (service gratuit saturé ?).')}
+}
+function foodMe(){if(!userPos)return needPos();foodAround([{lat:userPos[1],lng:userPos[0]}],600)}
+const _dim=dim;dim=function(l){_dim(l?l.concat(foodMk):l)};
+const _sd=selDay;selDay=function(i){_sd(i);foodAround(DAYS[i].pl,400)};
+const _bk=back;back=function(){_bk();clearFood()};
+const _at=allTrip;allTrip=function(){_at();clearFood()};
+
+// ===== Vérification des positions via OpenStreetMap (Nominatim) =====
+const GQ={'Friends — 90 Bedford Street':'90 Bedford Street, New York','Constance Billard (Sacred Heart)':'Convent of the Sacred Heart 1 East 91st Street New York','Staten Island Ferry (Whitehall)':'Whitehall Terminal Staten Island Ferry New York','Ferry East River (Pier 11)':'Pier 11 Wall Street New York','Hélicoptère (Downtown Heliport)':'Downtown Manhattan Heliport','Vélo Central Park (Columbus Circle)':'Columbus Circle New York','Marches du MET':'Metropolitan Museum of Art New York','Téléphérique de Roosevelt Island':'Roosevelt Island Tramway Manhattan','DUMBO (Washington Street)':'Washington Street DUMBO Brooklyn','Pebble Beach (Brooklyn Bridge Park)':'Pebble Beach Brooklyn Bridge Park','Pier 17 (Seaport)':'Pier 17 South Street Seaport New York','Bow Bridge (Central Park)':'Bow Bridge Central Park New York','Edge (Hudson Yards)':'Edge Hudson Yards New York','Smalls Jazz Club':'Smalls Jazz Club 183 West 10th Street New York','Mezzrow':'Mezzrow 163 West 10th Street New York','Zinc Bar':'Zinc Bar 82 West 3rd Street New York','Cellar Dog':'Cellar Dog 75 Christopher Street New York',"Arthur's Tavern":"Arthur's Tavern 57 Grove Street New York",'Winter Village Bryant Park':'Bryant Park New York','Midnight Moment (Times Square)':'Times Square New York','Trump Tower':'Trump Tower 725 Fifth Avenue New York','Levain Bakery (Upper West Side)':'Levain Bakery 167 West 74th Street New York','230 Fifth Rooftop':'230 Fifth Avenue New York','M Social Times Square Rooftop':'Millennium Times Square 145 West 44th Street New York','Pier 57 Rooftop':'Pier 57 New York','9/11 Museum':'National September 11 Memorial Museum New York','Brooklyn Heights Promenade':'Brooklyn Heights Promenade','Top of the Rock':'Top of the Rock Rockefeller Center New York','American Museum of Natural History':'American Museum of Natural History New York','Constance Billard':'Convent of the Sacred Heart New York'};
+const SKIP=/lever du soleil|coucher du soleil/;
+let POS={};try{POS=JSON.parse(localStorage.getItem('ny3d_pos')||'{}')}catch(e){}
+const savePos=()=>{try{localStorage.setItem('ny3d_pos',JSON.stringify(POS))}catch(e){}};
+const applyPos=(p,lat,lng,addr)=>{p.lat=lat;p.lng=lng;p.addr=addr;p.ok=true;p.m.setLngLat([lng,lat]);p.el.classList.remove('unv')};
+markers.forEach(p=>{const v=POS[p.name];if(v&&!p.ok)applyPos(p,v[0],v[1],v[2])});
+const _v=verify;verify=async function(i){await _v(i);const p=markers[i];if(p&&p.ok){POS[p.name]=[p.lat,p.lng,p.addr||''];savePos()}};
+async function verifyAll(){
+  const todo=markers.filter(p=>!p.ok&&!p.tmp&&!SKIP.test(p.name)),bad=[];let n=0;
+  for(let k=0;k<todo.length;k++){
+    const p=todo[k];toast(`Vérification ${k+1}/${todo.length} : ${p.name}`);
+    if(k)await sleep(1100);
+    try{
+      const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&viewbox=-74.26,40.92,-73.70,40.49&bounded=1&q='+encodeURIComponent(GQ[p.name]||p.geoq||p.name));
+      const j=await r.json();
+      if(j.length&&dist(p,{lat:+j[0].lat,lng:+j[0].lon})<1500){applyPos(p,+j[0].lat,+j[0].lon,j[0].display_name.split(',').slice(0,3).join(','));POS[p.name]=[p.lat,p.lng,p.addr];n++}
+      else bad.push(p.name);
+    }catch(e){bad.push(p.name)}
+  }
+  savePos();
+  ov.innerHTML=closeB+`<h3>✅ Vérification terminée</h3><p>${n} lieu(x) recalé(s) sur OpenStreetMap.</p>${bad.length?`<p class="warn">${bad.length} restent à vérifier à la main (introuvables ou trop éloignés de ma position) :</p><p>${bad.join('<br>')}</p>`:'<p>Tout est vérifié.</p>'}<p style="opacity:.7;font-size:12px">Les points de lever et de coucher du soleil restent des emplacements indicatifs de point de vue.</p>`;
+  ov.classList.add('on');
+}
+bVer.onclick=verifyAll;
+
+// Correction à la main : une adresse, ou des coordonnées copiées depuis Google Maps
+async function editPos(i){
+  const p=markers[i];
+  const v=prompt('Pour « '+p.name+' », colle une adresse (ex : 140 West 28th Street) ou des coordonnées copiées depuis Google Maps (ex : 40.7458, -73.9915) :');
+  if(!v||!v.trim())return;
+  const m=v.match(/^\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+  let lat,lng,addr=v.trim();
+  if(m){lat=+m[1];lng=+m[2];addr='Position saisie à la main'}
+  else{
+    try{
+      const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&viewbox=-74.26,40.92,-73.70,40.49&bounded=1&q='+encodeURIComponent(v+' New York'));
+      const j=await r.json();
+      if(!j.length)return toast('Adresse introuvable. Essaie avec les coordonnées copiées depuis Google Maps.');
+      lat=+j[0].lat;lng=+j[0].lon;addr=j[0].display_name.split(',').slice(0,3).join(',');
+    }catch(e){return toast('Recherche indisponible : utilise des coordonnées.')}
+  }
+  if(lat<40.4||lat>41||lng<-74.4||lng>-73.6)return toast('Ces coordonnées ne sont pas à New York : vérifie le signe moins devant la longitude.');
+  applyPos(p,lat,lng,addr);POS[p.name]=[lat,lng,addr];savePos();show(p);
+}
+
+// Hors ligne : nécessite le fichier sw.js à côté de index.html
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>

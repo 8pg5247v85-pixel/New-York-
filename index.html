@@ -77,6 +77,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:
   <button class="btn" id="bCal">🗓 Calendrier</button>
   <button class="btn" id="bSat">🛰 Satellite</button>
   <button class="btn" id="bBud">💰 Budget</button>
+  <button class="btn" id="bSave">💾 Sauvegarde</button>
 </div>
 <div id="side"></div><div id="toast"></div>
 <div id="todo"></div>
@@ -107,7 +108,8 @@ const P=[
 ['Hélicoptère (Downtown Heliport)','b',40.7012,-74.0090,'Financial District','Départ indicatif — à réserver.'],
 ['Marches du MET','p',40.7794,-73.9632,'Upper East Side','Les marches de Gossip Girl.'],
 ['Lotte New York Palace','t',40.7583,-73.9753,'Midtown','Hôtel de Gossip Girl (Chuck Bass).'],
-['Empire Hotel','h',40.7722,-73.9811,'Upper West Side','Rooftop et décor de Gossip Girl.'],
+['Empire Hotel','t',40.7722,-73.9811,'Upper West Side','Lieu À VISITER (décor de Gossip Girl) — ce n’est PAS votre hôtel.'],
+['SpringHill Suites Chelsea — NOTRE HÔTEL','h',40.7458,-73.9915,'Chelsea','Votre hébergement : SpringHill Suites by Marriott New York Manhattan/Chelsea.'],
 ['Bethesda Terrace','t',40.7740,-73.9710,'Central Park','Fontaine et esplanade, scènes de séries.'],
 ['Constance Billard (Sacred Heart)','t',40.7835,-73.9566,'Upper East Side','Lycée de Gossip Girl.'],
 ['Friends — 90 Bedford Street','t',40.7313,-74.0045,'West Village','Immeuble extérieur de la série.'],
@@ -192,7 +194,7 @@ function show(p){
 }
 async function verify(i){
   const p=markers[i];
-  const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&viewbox=-74.26,40.92,-73.70,40.49&bounded=1&q='+encodeURIComponent(p.name));
+  const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&viewbox=-74.26,40.92,-73.70,40.49&bounded=1&q='+encodeURIComponent(p.geoq||p.name));
   const j=await r.json();
   if(!j.length){alert('Introuvable dans OpenStreetMap : lieu à vérifier à la main.');return}
   p.lat=+j[0].lat;p.lng=+j[0].lon;p.addr=j[0].display_name.split(',').slice(0,3).join(',');p.ok=true;
@@ -445,6 +447,116 @@ bSat.onclick=()=>{
   if(map.getLayer('building-3d')){map.setPaintProperty('building-3d','fill-extrusion-opacity',on?.55:.92);map.setPaintProperty('building-3d','fill-extrusion-color',on?'#ffffff':'#d9dde6')}
 };
 bCal.onclick=cal;bBud.onclick=budget;
+function backup(){
+  ov.innerHTML=closeB+'<h3>💾 Sauvegarde</h3><p style="opacity:.7;font-size:13px">Ce texte contient tes heures et tes prix. Copie-le et garde-le dans une note. Pour restaurer sur un autre appareil ou une autre adresse, colle-le ici à la place, puis touche « Importer ».</p><textarea id="bk" style="width:100%;height:180px;background:#ffffff12;color:#fff;border:1px solid #ffffff30;border-radius:8px;padding:8px;font-size:12px"></textarea><div style="margin-top:8px"><button class="btn" onclick="copyBk()">📋 Copier</button> <button class="btn" onclick="impBk()">⬇ Importer</button></div>';
+  document.getElementById('bk').value=JSON.stringify(S);ov.classList.add('on');
+}
+function copyBk(){const t=document.getElementById('bk');t.select();try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand('copy')}toast('Copié.')}
+function impBk(){
+  try{const o=JSON.parse(document.getElementById('bk').value);if(!o||typeof o!=='object'||Array.isArray(o))throw 0;S=o;save();toast('Sauvegarde importée.');if(cur!=null)renderSide()}
+  catch(e){toast('Texte invalide : colle exactement le texte copié.')}
+}
+bSave.onclick=backup;
+
+// ===== ÉTAPE 5 : hôtel, position, food proche, spots photo, bars jazz, métro, hors ligne =====
+const HOTEL=markers.find(p=>p.cat==='h');
+HOTEL.geoq='140 West 28th Street, New York';HOTEL.addr='140 West 28th Street, New York, NY 10001';
+STATUS['Top of the Rock']='chk';STATUS['Edge (Hudson Yards)']='chk';
+
+// Spots photo (positions à vérifier avec le bouton « Vérifier »)
+[['Pebble Beach (Brooklyn Bridge Park)',40.7038,-73.9948,'DUMBO','Cadrage sous le Brooklyn Bridge, skyline de Lower Manhattan. Angle : vers le nord-ouest.'],
+ ['Brooklyn Heights Promenade',40.6963,-73.9972,'Brooklyn Heights','Vue dégagée sur Lower Manhattan et le Brooklyn Bridge. Angle : vers l’ouest.'],
+ ['Top of the Rock',40.7593,-73.9793,'Midtown','Vue qui inclut l’Empire State Building. Angle : vers le sud.'],
+ ['Pier 17 (Seaport)',40.7060,-74.0013,'Seaport','Vue sur le Brooklyn Bridge depuis le toit. Angle : vers le nord-est.'],
+ ['Edge (Hudson Yards)',40.7537,-74.0012,'Hudson Yards','Plateforme extérieure. À tenter au coucher du soleil.'],
+ ['Bow Bridge (Central Park)',40.7765,-73.9715,'Central Park','Pont en fonte avec les immeubles de l’Upper West Side derrière.'],
+ ['Little Island',40.7421,-74.0100,'Chelsea','Parc sur l’Hudson, couchers de soleil face à l’ouest.']
+].forEach(a=>pin({name:a[0],cat:'p',lat:a[1],lng:a[2],q:a[3],desc:a[4]+' (position à vérifier)',ok:false}));
+
+// 5 bars de jazz (positions et tarifs à vérifier)
+[['Smalls Jazz Club',40.7343,-74.0027,'West Village','183 W 10th St. Speakeasy hard bop. Plutôt cher (≈ 25 à 40 $).'],
+ ['Mezzrow',40.7343,-74.0021,'West Village','163 W 10th St. Salon piano à la bougie, idéal Saint-Valentin.'],
+ ['Zinc Bar',40.7308,-74.0005,'Greenwich Village','82 W 3rd St. Speakeasy, coin bar parfois sans cover.'],
+ ['Cellar Dog',40.7337,-74.0033,'West Village','75 Christopher St (ex-Fat Cat). Décontracté, abordable.'],
+ ["Arthur's Tavern",40.7328,-74.0036,'West Village','57 Grove St. Jazz de quartier. Adresse à vérifier.']
+].forEach(a=>pin({name:a[0],cat:'d',lat:a[1],lng:a[2],q:a[3],desc:a[4]+' Prix à vérifier.',ok:false}));
+
+const byName=n=>markers.find(p=>p.name===n);
+const setDay=(i,names)=>{DAYS[i].pl=names.map(byName).filter(Boolean)};
+setDay(0,['Chelsea Market','Pier 57 Rooftop','Little Island','High Line','Edge (Hudson Yards)']);
+setDay(1,['St. Patrick’s Cathedral','Rockefeller Center','Top of the Rock','Trump Tower','New York Public Library','Grand Central Terminal','SUMMIT One Vanderbilt','Times Square','Midnight Moment (Times Square)']);
+setDay(2,['Marches du MET','Constance Billard (Sacred Heart)','Bethesda Terrace','Bow Bridge (Central Park)','Strawberry Fields','Vélo Central Park (Columbus Circle)','Empire Hotel']);
+setDay(3,['Charging Bull','9/11 Memorial','9/11 Museum','Pier 17 (Seaport)','Staten Island Ferry (Whitehall)','Hélicoptère (Downtown Heliport)']);
+setDay(4,['Brooklyn Bridge — lever du soleil','DUMBO (Washington Street)','Manhattan Bridge','Pebble Beach (Brooklyn Bridge Park)','Brooklyn Heights Promenade','Brooklyn Bridge Park — coucher du soleil']);
+setDay(6,['Chinatown','Zinc Bar','Friends — 90 Bedford Street','Mezzrow']);
+
+// Départ de l'hôtel, retour par défaut, ou départ depuis ma position
+let startMode='hotel',retH=true,userPos=null,foodMk=[];
+const geo=new maplibregl.GeolocateControl({positionOptions:{enableHighAccuracy:true},trackUserLocation:true,showUserLocation:true});
+map.addControl(geo,'top-right');
+geo.on('geolocate',e=>{const first=!userPos;userPos=[e.coords.longitude,e.coords.latitude];if(first&&startMode==='gps'&&cur!=null)dayRoute()});
+const dist=(a,b)=>Math.hypot((a.lng-b.lng)*Math.cos(a.lat*Math.PI/180)*111320,(a.lat-b.lat)*110540);
+const needPos=()=>{toast('Autorise la localisation : touche aussi le bouton ◎ en haut à droite.');try{geo.trigger()}catch(e){}};
+function routePts(){
+  const pl=DAYS[cur].pl;if(!pl.length)return [HOTEL];
+  const s=startMode==='gps'&&userPos?{name:'Ma position',lat:userPos[1],lng:userPos[0]}:HOTEL;
+  return retH?[s,...pl,HOTEL]:[s,...pl];
+}
+const shortN=a=>a===HOTEL?'🏨 Hôtel':(a.name.length>24?a.name.slice(0,24)+'…':a.name);
+dayRoute=async function(){
+  if(cur==null)return;const pl=DAYS[cur].pl;dim(pl.concat(HOTEL));
+  const pts=routePts();
+  if(pts.length<2){draw(null);return renderSide(DAYS[cur][0]===21?'Jour du départ : retour à l’hôtel, puis direction aéroport ou gare.':'Ajoute au moins un lieu.')}
+  renderSide('Calcul du trajet…');
+  try{
+    const r=await getRoute(pts),em={foot:'🚶',bike:'🚴',car:'🚗'}[mode];draw(r.geometry);
+    const legs=r.legs.map((l,j)=>{const a=pts[j],b=pts[j+1];
+      const g=`https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${b.lat},${b.lng}&travelmode=transit`;
+      const adv=mode==='foot'?(l.duration/60<15?' · <b>à pied (gratuit)</b>':' · <b>métro conseillé</b>'):'';
+      return `${shortN(a)} → ${shortN(b)}<br>${em} ${fmt(l.distance,l.duration)} · <a href="${g}" target="_blank" rel="noopener" style="color:#6ee7ff">🚇 Métro</a>${adv}`}).join('<hr style="border:0;border-top:1px solid #ffffff18">');
+    renderSide(`<b>Total : ${fmt(r.distance,r.duration)}</b><br>${legs}<p style="opacity:.7;font-size:12px">Métro : 3,00 $ par trajet en tap-and-ride (carte sans contact ou téléphone), 3,50 $ le ticket papier, plafonné à 35 $ sur 7 jours (source : mta.info). Marcher est gratuit.</p>`);
+  }catch(e){renderSide('Itinéraire indisponible (service gratuit parfois saturé).')}
+};
+const _rs3=renderSide;renderSide=function(m){_rs3(m);if(cur==null)return;
+  const ri=document.getElementById('rinfo');if(!ri)return;const t=document.createElement('div');
+  t.innerHTML=`<div style="margin:6px 0">Départ : <span class="chip ${startMode==='hotel'?'':'off'}" onclick="setStart('hotel')">🏨 Hôtel</span> <span class="chip ${startMode==='gps'?'':'off'}" onclick="setStart('gps')">📍 Ma position</span> <span class="chip ${retH?'':'off'}" onclick="toggleRet()">↩ Retour hôtel</span></div><button onclick="nearest()">🧭 De ma position vers le lieu le plus proche</button><button onclick="foodMe()">🍔 Food près de moi</button>`;
+  ri.parentNode.insertBefore(t,ri)};
+function setStart(m){startMode=m;if(m==='gps'&&!userPos)needPos();dayRoute()}
+function toggleRet(){retH=!retH;dayRoute()}
+function nearest(){
+  if(cur==null)return toast('Choisis d’abord une journée.');
+  if(!userPos)return needPos();
+  const me={name:'Ma position',lat:userPos[1],lng:userPos[0]},pl=DAYS[cur].pl;if(!pl.length)return;
+  const t=pl.reduce((a,b)=>dist(me,a)<dist(me,b)?a:b);
+  getRoute([me,t]).then(r=>{draw(r.geometry);fit([me,t]);toast('Vers '+t.name+' : '+fmt(r.distance,r.duration))}).catch(()=>toast('Itinéraire indisponible.'));
+}
+
+// Food : uniquement tes adresses, à moins de 400 m du programme (ou 600 m autour de moi)
+const FOOD_RE="Mimi|Levain|Crumbl|Gnocchi|Shake Shack|Apollo Bagels|Leon.s Bagels|Ray.s (Famous )?Pizza|Raising Cane|McDonald|Wendy|Chick-fil-A|Arthur (&|and) Sons|^KEA|Pasta de Pasta|Joe (&|and) The Juice";
+function clearFood(){foodMk.forEach(p=>{p.m.remove();const i=markers.indexOf(p);if(i>-1)markers.splice(i,1)});foodMk=[]}
+async function foodAround(pts,r){
+  clearFood();if(!pts.length)return;
+  const q='[out:json][timeout:25];('+pts.map(p=>`nwr["name"~"${FOOD_RE}",i](around:${r},${p.lat},${p.lng});`).join('')+');out center 80;';
+  try{
+    const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});
+    const j=await res.json(),seen=new Set();
+    (j.elements||[]).forEach(el=>{
+      const lat=el.lat!=null?el.lat:el.center&&el.center.lat,lng=el.lon!=null?el.lon:el.center&&el.center.lon,k=el.type+el.id;
+      if(lat==null||seen.has(k))return;seen.add(k);
+      const t=el.tags||{},addr=[t['addr:housenumber'],t['addr:street']].filter(Boolean).join(' '),near=Math.round(Math.min(...pts.map(p=>dist(p,{lat,lng}))));
+      foodMk.push(pin({name:t.name||'Restaurant',cat:'f',lat,lng,q:t['addr:suburb']||'',addr:addr||'adresse à vérifier',desc:`À environ ${near} m du point de recherche.`,ok:true}));
+    });
+    toast(foodMk.length?foodMk.length+' adresse(s) food trouvée(s) à proximité.':'Aucune de tes adresses food à proximité.');
+  }catch(e){toast('Recherche des restaurants indisponible (service gratuit saturé ?).')}
+}
+function foodMe(){if(!userPos)return needPos();foodAround([{lat:userPos[1],lng:userPos[0]}],600)}
+const _dim=dim;dim=function(l){_dim(l?l.concat(foodMk):l)};
+const _sd=selDay;selDay=function(i){_sd(i);foodAround(DAYS[i].pl,400)};
+const _bk=back;back=function(){_bk();clearFood()};
+const _at=allTrip;allTrip=function(){_at();clearFood()};
+
+// Hors ligne : nécessite le fichier sw.js à côté de index.html
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
 </html>
